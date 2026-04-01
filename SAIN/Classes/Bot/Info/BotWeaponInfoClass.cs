@@ -135,7 +135,7 @@ public class BotWeaponInfoClass : BotBase
         float DifficultyModifier = Bot.Info.Profile.DifficultyModifier.Scale0to1(_shootSettings.DifficultyScaling).Round100();
 
         FinalModifier = (
-            WeaponClassModifier * RecoilModifier * ErgoModifier * AmmoCaliberModifier * ProficiencyModifier * DifficultyModifier
+            WeaponClassModifier * RecoilModifier * ErgoModifier * AmmoCaliberModifier * ProficiencyModifier / DifficultyModifier
         ).Round100();
     }
 

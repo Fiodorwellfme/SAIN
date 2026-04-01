@@ -1,17 +1,11 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Reflection;
-using System.Reflection.Emit;
-using CommonAssets.Scripts.Audio;
+﻿using System.Reflection;
+using Comfort.Common;
 using EFT;
-using EFT.Interactive;
 using EFT.InventoryLogic;
 using HarmonyLib;
 using SAIN.Components;
-using SAIN.Components.Helpers;
 using SAIN.Components.PlayerComponentSpace;
 using SPT.Reflection.Patching;
-using Systems.Effects;
 using UnityEngine;
 
 namespace SAIN.Patches.Hearing;
@@ -115,8 +109,9 @@ public class SoundClipNameCheckerPatch2 : ModulePatch
 /// </summary>
 public class TogglableSetPatch : ModulePatch
 {
-    private static readonly AccessTools.FieldRef<Player, Vector3> _speechLocalPosition =
-        AccessTools.FieldRefAccess<Player, Vector3>("SpeechLocalPosition");
+    private static readonly AccessTools.FieldRef<Player, Vector3> _speechLocalPosition = AccessTools.FieldRefAccess<Player, Vector3>(
+        "SpeechLocalPosition"
+    );
 
     protected override MethodBase GetTargetMethod()
     {
@@ -126,6 +121,11 @@ public class TogglableSetPatch : ModulePatch
     [PatchPrefix]
     public static void PatchPrefix(TogglableComponent __instance, bool value, bool simulate, bool silent)
     {
+        if (Singleton<EFT.GameWorld>.Instance is HideoutGameWorld)
+        {
+            return;
+        }
+
         if (!simulate && !silent && __instance.On != value && __instance.Item.Owner is Player.PlayerInventoryController invCont)
         {
             Player player = invCont.Player_0;

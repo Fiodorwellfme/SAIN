@@ -42,12 +42,15 @@ namespace SAIN.Patches.Generic
             }
         }
 
-        public class SetInHands_Weapon_Patch : ModulePatch
+        /// <summary>
+        /// Patches method which is called when weapon is swapped.
+        /// </summary>
+        public class Proceed_Weapon_Patch : ModulePatch
         {
             protected override MethodBase GetTargetMethod()
             {
-                System.Type[] Params = [typeof(Weapon), typeof(Callback<IFirearmHandsController>)];
-                return AccessTools.Method(typeof(Player), nameof(Player.SetInHands), Params);
+                System.Type[] Params = [typeof(Weapon), typeof(Callback<IFirearmHandsController>), typeof(bool)];
+                return AccessTools.Method(typeof(Player), nameof(Player.Proceed), Params);
             }
 
             [PatchPostfix]

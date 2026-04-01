@@ -106,7 +106,7 @@ public class PlayerComponent : MonoBehaviour, IDisposable, ISPlayer
             {
                 Weapon LastWeapon = _currentWeapon;
 #if DEBUG
-                Logger.LogDebug($"[{Player?.Profile.Nickname}] Equipped Weapon [{value?.ShortName}] Last Weapon [{LastWeapon?.ShortName}]");
+                Logger.LogDebug($"[{Player?.Profile.Nickname}] Equipped Weapon [{value?.ShortName?.Localized()}] Last Weapon [{LastWeapon?.ShortName?.Localized()}]");
 #endif
                 _currentWeapon = value;
                 OnWeaponEquipped?.Invoke(value, LastWeapon);
@@ -125,7 +125,7 @@ public class PlayerComponent : MonoBehaviour, IDisposable, ISPlayer
             {
                 Item LastItem = _currentItem;
 #if DEBUG
-                Logger.LogDebug($"[{Player?.Profile.Nickname}] Equipped Item [{value?.ShortName}] Last Item [{LastItem?.ShortName}]");
+                Logger.LogDebug($"[{Player?.Profile.Nickname}] Equipped Item [{value?.ShortName?.Localized()}] Last Item [{LastItem?.ShortName?.Localized()}]");
 #endif
                 _currentItem = value;
                 OnItemEquipped?.Invoke(value, LastItem);

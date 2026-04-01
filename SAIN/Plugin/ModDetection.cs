@@ -86,7 +86,11 @@ public static class ModDetection
 
             FikaInterop.InitializeInterop();
 
-            Logger.LogInfo($"SAIN: Project Fika Detected.");
+            Logger.LogInfo($"Fika detected, loading interop compatabilities");
+        }
+        else
+        {
+            Logger.LogInfo("Fika not loaded, Loading Fika.Core");
         }
 
         if (Chainloader.PluginInfos.ContainsKey(FikaHeadlessGUID))
