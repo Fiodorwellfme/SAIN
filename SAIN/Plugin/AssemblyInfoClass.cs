@@ -23,8 +23,7 @@ public static class AssemblyInfoClass
     public const string EscapeFromTarkov = "EscapeFromTarkov.exe";
 
     public const string SAINGUID = "me.sol.sain";
-    public const string SAINName = "SAIN";
-    public const string SAINVersion = "4.4.0";
+    public const string SAINName = "SAIN - Fika Enhanced Edition";
     public const string SAINPresetVersion = "4.4.0";
 
     public const string SPTVersion = "4.0.0";

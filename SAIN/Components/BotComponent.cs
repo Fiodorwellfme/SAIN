@@ -86,7 +86,7 @@ public class BotComponent : BotComponentBase, ISPlayer
 
     public event Action<BotComponent> OnBotActivated;
 
-    public bool IsCheater { get; private set; }
+    public bool IsCheater { get; private set; } = true;
 
     public bool BotActive
     {
