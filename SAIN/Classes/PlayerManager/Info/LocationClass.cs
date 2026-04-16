@@ -112,7 +112,7 @@ public class LocationClass : GameWorldBase, IGameWorldClass
                 break;
 
             case "woods":
-                Location = ELocation.Streets;
+                Location = ELocation.Woods;
                 break;
 
             case "terminal":
