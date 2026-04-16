@@ -36,6 +36,10 @@ public class GeneralSettings : SAINSettingsBase<GeneralSettings>, ISAINSettings
 
     public FlashlightSettings Flashlight = new();
 
+    [Name("Looting Bots Integration")]
+    [Description("Modify settings that relate to Looting Bots. Requires Looting Bots to be installed.")]
+    public LootingBotsSettings LootingBots = new();
+
     public JokeSettings Jokes = new();
 
     public DebugSettings Debug = new();
@@ -53,6 +57,7 @@ public class GeneralSettings : SAINSettingsBase<GeneralSettings>, ISAINSettings
         list.Add(Doors);
         list.Add(Extract);
         list.Add(Flashlight);
+        list.Add(LootingBots);
         list.Add(Jokes);
         list.Add(Layers);
         Debug.Init(list);

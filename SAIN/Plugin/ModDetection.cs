@@ -24,6 +24,7 @@ public static class ModDetection
         }
     }
 
+    public static bool LootingBotsLoaded { get; private set; }
     public static bool RealismLoaded { get; private set; }
     public static bool QuestingBotsLoaded { get; private set; }
     public static bool ProjectFikaLoaded { get; private set; }
@@ -100,6 +101,11 @@ public static class ModDetection
             QuestingBotsLoaded = true;
             Logger.LogInfo($"SAIN: Questing Bots Detected.");
         }
+        if (Chainloader.PluginInfos.ContainsKey(LootingBotsGUID))
+        {
+            LootingBotsLoaded = true;
+            Logger.LogInfo($"SAIN: Looting Bots Detected.");
+        }
         if (Chainloader.PluginInfos.ContainsKey(RealismModKey))
         {
             RealismLoaded = true;
@@ -125,6 +131,7 @@ public static class ModDetection
         BeginVertical();
 
         BeginHorizontal();
+        IsDetected(LootingBotsLoaded, "Looting Bots");
         IsDetected(QuestingBotsLoaded, "Questing Bots");
         IsDetected(RealismLoaded, "Realism Mod");
         EndHorizontal();
