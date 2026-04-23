@@ -10,7 +10,7 @@ public sealed record SAINServermodMetadata : AbstractModMetadata
     public override string Name { get; init; } = "SAIN";
     public override string Author { get; init; } = "Solarint";
     public override List<string>? Contributors { get; init; } = [];
-    public override Version Version { get; init; } = new("4.4.2");
+    public override Version Version { get; init; } = new("4.4.3");
     public override Range SptVersion { get; init; } = new("~4.0.0");
     public override List<string>? Incompatibilities { get; init; } = [];
     public override Dictionary<string, Range>? ModDependencies { get; init; } = [];
