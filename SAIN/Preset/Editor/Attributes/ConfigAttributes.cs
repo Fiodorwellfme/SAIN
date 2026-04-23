@@ -187,11 +187,3 @@ public enum EListType
     Array,
     Dictionary,
 }
-
-public enum IAdvancedOption
-{
-    None,
-    IsAdvanced,
-    Hidden,
-    CopyValueFromEFT,
-}
