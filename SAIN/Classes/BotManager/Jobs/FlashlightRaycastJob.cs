@@ -11,6 +11,7 @@ namespace SAIN.Components;
 
 public class FlashlightRaycastJob : SainJobTemplate, IDisposable
 {
+    private const float InvestigateVisibleTickTime = 0.1f;
     private const float LaserTraceDistance = 75;
 
     private const float Wide_FlashLightBeamAngle = 16f;
@@ -31,6 +32,8 @@ public class FlashlightRaycastJob : SainJobTemplate, IDisposable
     protected readonly List<RaycastJob> RaycastJobs = [];
     protected readonly List<Quaternion> _rotationsList_Wide = [];
     protected readonly List<Quaternion> _rotationsList_Tight = [];
+    private readonly Dictionary<LightExposureKey, float> _visibleExposureTimes = [];
+    private readonly HashSet<LightExposureKey> _currentExposureKeys = [];
 
     protected override IEnumerator PrimaryFunction()
     {
@@ -51,6 +54,11 @@ public class FlashlightRaycastJob : SainJobTemplate, IDisposable
                 yield return null;
                 ReadLightDetectionJobData(Total);
                 Dispose();
+            }
+            else
+            {
+                _visibleExposureTimes.Clear();
+                _currentExposureKeys.Clear();
             }
         }
     }
@@ -102,6 +110,7 @@ public class FlashlightRaycastJob : SainJobTemplate, IDisposable
             {
                 List<Vector3> LightPoints = Player.Flashlight.LightDetection.LightPoints;
                 LightPoints.Clear();
+                AddLaserPathPoints(Player, Hits, LightPoints);
                 for (int j = Hits.Length - 1; j >= 0; j--)
                 {
                     RaycastHit Hit = Hits[j];
@@ -124,8 +133,36 @@ public class FlashlightRaycastJob : SainJobTemplate, IDisposable
         }
     }
 
+    private static void AddLaserPathPoints(PlayerComponent player, NativeArray<RaycastHit> hits, List<Vector3> lightPoints)
+    {
+        if (player == null || (!player.Flashlight.Laser && !player.Flashlight.IRLaser))
+        {
+            return;
+        }
+
+        Vector3 origin = player.Transform.WeaponData.FirePort;
+        Vector3 direction = player.Transform.WeaponData.PointDirection;
+        if (direction == Vector3.zero)
+        {
+            return;
+        }
+
+        float maxDistance = LaserTraceDistance;
+        if (hits.Length > 0 && hits[0].collider != null)
+        {
+            maxDistance = Mathf.Min(LaserTraceDistance, Vector3.Distance(origin, hits[0].point));
+        }
+
+        float spacing = GetLaserPathPointSpacing();
+        for (float distance = spacing; distance < maxDistance; distance += spacing)
+        {
+            lightPoints.Add(origin + direction * distance);
+        }
+    }
+
     private void CreateLightDetectionJobs()
     {
+        _currentExposureKeys.Clear();
         HashSet<PlayerComponent> players = GameWorldComponent.Instance.PlayerTracker.AlivePlayerArray;
         foreach (BotComponent Bot in AliveBots.Values)
         {
@@ -161,6 +198,7 @@ public class FlashlightRaycastJob : SainJobTemplate, IDisposable
                     continue;
                 }
 
+                _currentExposureKeys.Add(new LightExposureKey(Bot.ProfileId, player.ProfileId));
                 RaycastJobs.Add(
                     new RaycastJob(
                         playerLight.LightDetection.LightPoints,
@@ -183,24 +221,104 @@ public class FlashlightRaycastJob : SainJobTemplate, IDisposable
             NativeArray<RaycastHit> Hits = Job.Hits;
             if (GameWorldComponent.TryGetPlayerComponent(Job.Owner, out PlayerComponent Player))
             {
-                bool VisiblePoint = false;
-                foreach (RaycastHit Hit in Hits)
+                if (Job.Target == null)
                 {
+                    continue;
+                }
+
+                bool VisiblePoint = false;
+                List<Vector3> points = Job.Points;
+                Vector3 eyePosition = Player.Transform.EyePosition;
+                Vector3 lookDirection = Player.Transform.LookDirection;
+                LightExposureKey key = new(Player.ProfileId, Job.Target.ProfileId);
+                for (int j = 0; j < Hits.Length; j++)
+                {
+                    RaycastHit Hit = Hits[j];
                     if (Hit.collider == null)
                     {
-                        VisiblePoint = true;
-                        break;
+                        if (points == null || j >= points.Count)
+                        {
+                            VisiblePoint = true;
+                            break;
+                        }
+
+                        Vector3 dirToPoint = (points[j] - eyePosition).normalized;
+                        if (Vector3.Dot(lookDirection, dirToPoint) >= GetInvestigateFOVDotThreshold())
+                        {
+                            VisiblePoint = true;
+                            break;
+                        }
                     }
                 }
-                if (VisiblePoint && Job.Target != null)
+
+                if (!VisiblePoint)
+                {
+                    _visibleExposureTimes.Remove(key);
+                    continue;
+                }
+
+                float visibleTime = 0f;
+                _visibleExposureTimes.TryGetValue(key, out visibleTime);
+                visibleTime += InvestigateVisibleTickTime;
+                _visibleExposureTimes[key] = visibleTime;
+
+                if (visibleTime >= GetInvestigateVisibleTimeRequired())
                 {
                     Player.Flashlight.LightDetection.TryToInvestigate(Job.Target);
                 }
             }
         }
+
+        ResetExpiredExposureKeys();
     }
 
     private readonly List<RandomDir> _directionsList = [];
+
+    private static SAIN.Preset.GlobalSettings.FlashlightSettings FlashlightSettings
+    {
+        get { return SAINPlugin.LoadedPreset.GlobalSettings.General.Flashlight; }
+    }
+
+    private static float GetInvestigateFOVDotThreshold()
+    {
+        float totalFovDegrees = Mathf.Clamp(FlashlightSettings.InvestigateFOVThreshold, 0f, 360f);
+        float halfFovRadians = (totalFovDegrees * 0.5f) * Mathf.Deg2Rad;
+        return Mathf.Cos(halfFovRadians);
+    }
+
+    private static float GetInvestigateVisibleTimeRequired()
+    {
+        return FlashlightSettings.InvestigateVisibleTimeRequired;
+    }
+
+    private static float GetLaserPathPointSpacing()
+    {
+        return FlashlightSettings.LaserPathPointSpacing;
+    }
+
+    private void ResetExpiredExposureKeys()
+    {
+        if (_visibleExposureTimes.Count == 0)
+        {
+            return;
+        }
+
+        _keysToReset.Clear();
+        foreach (LightExposureKey key in _visibleExposureTimes.Keys)
+        {
+            if (!_currentExposureKeys.Contains(key))
+            {
+                _keysToReset.Add(key);
+            }
+        }
+
+        for (int i = 0; i < _keysToReset.Count; i++)
+        {
+            _visibleExposureTimes.Remove(_keysToReset[i]);
+        }
+    }
+
+    private readonly List<LightExposureKey> _keysToReset = [];
 
     private void ScheduleJobs(int Total)
     {
@@ -239,6 +357,37 @@ public class FlashlightRaycastJob : SainJobTemplate, IDisposable
         for (int i = 0; i < rotationsList.Count; i++)
         {
             beamDirections.Add(new(distance, (rotationsList[i] * weaponPointDir).normalized));
+        }
+    }
+
+    private readonly struct LightExposureKey : IEquatable<LightExposureKey>
+    {
+        public LightExposureKey(string botProfileId, string sourceProfileId)
+        {
+            BotProfileId = botProfileId;
+            SourceProfileId = sourceProfileId;
+        }
+
+        public readonly string BotProfileId;
+        public readonly string SourceProfileId;
+
+        public bool Equals(LightExposureKey other)
+        {
+            return BotProfileId == other.BotProfileId && SourceProfileId == other.SourceProfileId;
+        }
+
+        public override bool Equals(object obj)
+        {
+            return obj is LightExposureKey other && Equals(other);
+        }
+
+        public override int GetHashCode()
+        {
+            unchecked
+            {
+                return ((BotProfileId != null ? BotProfileId.GetHashCode() : 0) * 397)
+                    ^ (SourceProfileId != null ? SourceProfileId.GetHashCode() : 0);
+            }
         }
     }
 
