@@ -58,14 +58,14 @@ public class FlashLightClass(PlayerComponent component) : PlayerComponentBase(co
         CheckUsingLightModes();
 
         bool wasUsingLight = UsingLight;
-        UsingLight = (ActiveModes & (DeviceMode.WhiteLight | DeviceMode.IRLight)) == (DeviceMode.WhiteLight | DeviceMode.IRLight);
+        UsingLight = (ActiveModes & (DeviceMode.WhiteLight | DeviceMode.IRLight)) != 0;
         if (wasUsingLight != UsingLight)
         {
             OnLightToggle?.Invoke(UsingLight);
         }
 
         bool wasUsingLaser = UsingLaser;
-        UsingLaser = (ActiveModes & (DeviceMode.VisibleLaser | DeviceMode.IRLaser)) == (DeviceMode.VisibleLaser | DeviceMode.IRLaser);
+        UsingLaser = (ActiveModes & (DeviceMode.VisibleLaser | DeviceMode.IRLaser)) != 0;
         if (wasUsingLaser != UsingLaser)
         {
             OnLaserToggle?.Invoke(UsingLaser);
@@ -110,65 +110,110 @@ public class FlashLightClass(PlayerComponent component) : PlayerComponentBase(co
             return;
         }
 
-        // Loop through all of the tacticalComboVisualControllers, then its modes, then that modes children, and look for a light
+        // Loop through all active tactical modes and classify them from the runtime markers
         foreach (TacticalComboVisualController tacticalComboVisualController in TacticalDevices)
         {
             List<Transform> tacticalModes = _tacticalModesField(tacticalComboVisualController);
+            if (tacticalModes == null)
+            {
+                continue;
+            }
+
             foreach (var mode in tacticalModes)
             {
-                // Skip disabled modes
-                if (!mode.gameObject.activeInHierarchy)
+                if (mode == null || !mode.gameObject.activeInHierarchy)
                 {
                     continue;
                 }
 
-                for (int i = 0; i < mode.childCount; i++)
-                {
-                    Transform child = mode.GetChild(i);
-                    string name = child.name;
-                    if (!WhiteLight && name.StartsWith("light_0", StringComparison.OrdinalIgnoreCase))
-                    {
-#if DEBUG
-                        if (_debugMode)
-                        {
-                            Logger.LogDebug($"[{player.name}] Found WhiteLight : Name:{name}");
-                        }
-#endif
-                        ActiveModes |= DeviceMode.WhiteLight;
-                    }
-                    if (!Laser && name.StartsWith("vis_0", StringComparison.OrdinalIgnoreCase))
-                    {
-#if DEBUG
-                        if (_debugMode)
-                        {
-                            Logger.LogDebug($"[{player.name}] Found VisibleLaser : Name:{name}");
-                        }
-#endif
-                        ActiveModes |= DeviceMode.VisibleLaser;
-                    }
-                    if (!IRLight && name.StartsWith("il_0", StringComparison.OrdinalIgnoreCase))
-                    {
-#if DEBUG
-                        if (_debugMode)
-                        {
-                            Logger.LogDebug($"[{player.name}] Found IRLight : Name:{name}");
-                        }
-#endif
-                        ActiveModes |= DeviceMode.IRLight;
-                    }
-                    if (!IRLaser && name.StartsWith("ir_0", StringComparison.OrdinalIgnoreCase))
-                    {
-#if DEBUG
-                        if (_debugMode)
-                        {
-                            Logger.LogDebug($"[{player.name}] Found IRLaser : Name:{name}");
-                        }
-#endif
-                        ActiveModes |= DeviceMode.IRLaser;
-                    }
-                }
+                ActiveModes |= ClassifyActiveMode(mode, player);
             }
         }
+    }
+
+    private static DeviceMode ClassifyActiveMode(Transform mode, Player player)
+    {
+        DeviceMode result = DeviceMode.None;
+
+        for (int i = 0; i < mode.childCount; i++)
+        {
+            Transform child = mode.GetChild(i);
+            if (child == null)
+            {
+                continue;
+            }
+
+            string name = child.name;
+            if (name.StartsWith("light_", StringComparison.OrdinalIgnoreCase))
+            {
+#if DEBUG
+                if (_debugMode)
+                {
+                    Logger.LogDebug($"[{player.name}] Found WhiteLight : Mode:{mode.name} Name:{name}");
+                }
+#endif
+                result |= DeviceMode.WhiteLight;
+            }
+            else if (name.StartsWith("vis_", StringComparison.OrdinalIgnoreCase))
+            {
+#if DEBUG
+                if (_debugMode)
+                {
+                    Logger.LogDebug($"[{player.name}] Found VisibleLaser : Mode:{mode.name} Name:{name}");
+                }
+#endif
+                result |= DeviceMode.VisibleLaser;
+            }
+            else if (name.StartsWith("il_", StringComparison.OrdinalIgnoreCase))
+            {
+#if DEBUG
+                if (_debugMode)
+                {
+                    Logger.LogDebug($"[{player.name}] Found IRLight : Mode:{mode.name} Name:{name}");
+                }
+#endif
+                result |= DeviceMode.IRLight;
+            }
+            else if (name.StartsWith("ir_", StringComparison.OrdinalIgnoreCase))
+            {
+#if DEBUG
+                if (_debugMode)
+                {
+                    Logger.LogDebug($"[{player.name}] Found IRLaser : Mode:{mode.name} Name:{name}");
+                }
+#endif
+                result |= DeviceMode.IRLaser;
+            }
+        }
+
+        LaserBeam[] lasers = mode.GetComponentsInChildren<LaserBeam>(true);
+        for (int i = 0; i < lasers.Length; i++)
+        {
+            LaserBeam laser = lasers[i];
+            if (laser == null || !laser.isActiveAndEnabled)
+            {
+                continue;
+            }
+
+            string beamMaterial = laser.BeamMaterial != null ? laser.BeamMaterial.name : string.Empty;
+            string pointMaterial = laser.PointMaterial != null ? laser.PointMaterial.name : string.Empty;
+            bool irLaser = beamMaterial.IndexOf("ik", StringComparison.OrdinalIgnoreCase) >= 0
+                || pointMaterial.IndexOf("ik", StringComparison.OrdinalIgnoreCase) >= 0;
+
+#if DEBUG
+            if (_debugMode)
+            {
+                Logger.LogDebug(
+                    $"[{player.name}] Found {(irLaser ? "IRLaser" : "VisibleLaser")} : " +
+                    $"Mode:{mode.name} BeamMat:{beamMaterial} PointMat:{pointMaterial}"
+                );
+            }
+#endif
+
+            result |= irLaser ? DeviceMode.IRLaser : DeviceMode.VisibleLaser;
+        }
+
+        return result;
     }
 
     private static bool _debugMode

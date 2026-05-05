@@ -29,6 +29,12 @@ public class LightDetectionClass(PlayerComponent component) : PlayerComponentBas
         var botComponent = PlayerComponent.BotComponent;
         if (botComponent != null)
         {
+            var enemy = botComponent.EnemyController.CheckAddEnemy(Player);
+            if (enemy == null)
+            {
+                return;
+            }
+
             botComponent.Squad.SquadInfo.AddPointToSearch(
                 estimatedPosition,
                 25f,

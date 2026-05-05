@@ -64,6 +64,7 @@ public class FlashlightRaycastJob : SainJobTemplate, IDisposable
             if (player != null && player.IsActive && player.Flashlight.DeviceActive)
             {
                 Vector3 WeaponPointDir = player.Transform.WeaponData.PointDirection;
+                Vector3 WeaponFirePort = player.Transform.WeaponData.FirePort;
                 if (player.Flashlight.Laser || player.Flashlight.IRLaser)
                 {
                     Directions.Add(new(LaserTraceDistance, WeaponPointDir));
@@ -78,7 +79,7 @@ public class FlashlightRaycastJob : SainJobTemplate, IDisposable
                     RaycastJobs.Add(
                         new RaycastJob(
                             Directions,
-                            player.Transform.WeaponData.PointDirection,
+                            WeaponFirePort,
                             LayerMaskClass.HighPolyWithTerrainMaskAI,
                             player.Player,
                             null
@@ -125,33 +126,50 @@ public class FlashlightRaycastJob : SainJobTemplate, IDisposable
 
     private void CreateLightDetectionJobs()
     {
+        HashSet<PlayerComponent> players = GameWorldComponent.Instance.PlayerTracker.AlivePlayerArray;
         foreach (BotComponent Bot in AliveBots.Values)
         {
-            if (Bot != null && Bot.BotActive)
+            if (Bot == null || !Bot.BotActive)
             {
-                foreach (Enemy Enemy in Bot.EnemyController.Enemies.Values)
+                continue;
+            }
+
+            foreach (PlayerComponent player in players)
+            {
+                if (
+                    player == null
+                    || !player.IsActive
+                    || !player.Flashlight.DeviceActive
+                    || player.Player == null
+                    || Bot.Player == null
+                    || player.ProfileId == Bot.ProfileId
+                    || Bot.EnemyController.IsPlayerFriendly(player.Player)
+                )
                 {
-                    if (Enemy != null && Enemy.PlayerComponent.IsActive)
-                    {
-                        FlashLightClass EnemyLight = Enemy.EnemyPlayerComponent.Flashlight;
-                        if (
-                            EnemyLight.DeviceActive
-                            && Bot.PlayerComponent.Flashlight.LightDetection.CheckIsBeamVisible(EnemyLight)
-                            && Enemy.RealDistance <= 125f
-                        )
-                        {
-                            RaycastJobs.Add(
-                                new RaycastJob(
-                                    EnemyLight.LightDetection.LightPoints,
-                                    Bot.Transform.EyePosition,
-                                    LayerMaskClass.HighPolyWithTerrainMaskAI,
-                                    Bot.Player,
-                                    Enemy.Player
-                                )
-                            );
-                        }
-                    }
+                    continue;
                 }
+
+                float sqrDistance = (player.Position - Bot.Position).sqrMagnitude;
+                if (sqrDistance > 125f * 125f)
+                {
+                    continue;
+                }
+
+                FlashLightClass playerLight = player.Flashlight;
+                if (!Bot.PlayerComponent.Flashlight.LightDetection.CheckIsBeamVisible(playerLight))
+                {
+                    continue;
+                }
+
+                RaycastJobs.Add(
+                    new RaycastJob(
+                        playerLight.LightDetection.LightPoints,
+                        Bot.Transform.EyePosition,
+                        LayerMaskClass.HighPolyWithTerrainMaskAI,
+                        Bot.Player,
+                        player.Player
+                    )
+                );
             }
         }
     }
